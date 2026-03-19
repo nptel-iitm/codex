@@ -1,5 +1,3 @@
-mod storage;
-
 use async_trait::async_trait;
 use chrono::Utc;
 use reqwest::StatusCode;
@@ -19,13 +17,12 @@ use codex_app_server_protocol::AuthMode as ApiAuthMode;
 use codex_otel::TelemetryAuthMode;
 use codex_protocol::config_types::ForcedLoginMethod;
 
-pub use crate::auth::storage::AuthCredentialsStoreMode;
-pub use crate::auth::storage::AuthDotJson;
-use crate::auth::storage::AuthStorageBackend;
-use crate::auth::storage::create_auth_storage;
-use crate::config::Config;
 use crate::error::RefreshTokenFailedError;
 use crate::error::RefreshTokenFailedReason;
+pub use crate::storage::AuthCredentialsStoreMode;
+pub use crate::storage::AuthDotJson;
+use crate::storage::AuthStorageBackend;
+use crate::storage::create_auth_storage;
 use crate::token_data::KnownPlan as InternalKnownPlan;
 use crate::token_data::PlanType as InternalPlanType;
 use crate::token_data::TokenData;
@@ -335,7 +332,7 @@ impl CodexAuth {
             last_refresh: Some(Utc::now()),
         };
 
-        let client = crate::default_client::create_client();
+        let client = create_client();
         let state = ChatgptAuthState {
             auth_dot_json: Arc::new(Mutex::new(Some(auth_dot_json))),
             client,
@@ -351,7 +348,7 @@ impl CodexAuth {
     }
 
     pub fn from_api_key(api_key: &str) -> Self {
-        Self::from_api_key_with_client(api_key, crate::default_client::create_client())
+        Self::from_api_key_with_client(api_key, create_client())
     }
 }
 
@@ -458,11 +455,19 @@ pub fn load_auth_dot_json(
     storage.load()
 }
 
-pub fn enforce_login_restrictions(config: &Config) -> std::io::Result<()> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoginRestrictions {
+    pub codex_home: PathBuf,
+    pub auth_credentials_store_mode: AuthCredentialsStoreMode,
+    pub forced_login_method: Option<ForcedLoginMethod>,
+    pub forced_chatgpt_workspace_id: Option<String>,
+}
+
+pub fn enforce_login_restrictions(config: &LoginRestrictions) -> std::io::Result<()> {
     let Some(auth) = load_auth(
         &config.codex_home,
         /*enable_codex_api_key_env*/ true,
-        config.cli_auth_credentials_store_mode,
+        config.auth_credentials_store_mode,
     )?
     else {
         return Ok(());
@@ -486,7 +491,7 @@ pub fn enforce_login_restrictions(config: &Config) -> std::io::Result<()> {
             return logout_with_message(
                 &config.codex_home,
                 message,
-                config.cli_auth_credentials_store_mode,
+                config.auth_credentials_store_mode,
             );
         }
     }
@@ -504,7 +509,7 @@ pub fn enforce_login_restrictions(config: &Config) -> std::io::Result<()> {
                     format!(
                         "Failed to load ChatGPT credentials while enforcing workspace restrictions: {err}. Logging out."
                     ),
-                    config.cli_auth_credentials_store_mode,
+                    config.auth_credentials_store_mode,
                 );
             }
         };
@@ -523,7 +528,7 @@ pub fn enforce_login_restrictions(config: &Config) -> std::io::Result<()> {
             return logout_with_message(
                 &config.codex_home,
                 message,
-                config.cli_auth_credentials_store_mode,
+                config.auth_credentials_store_mode,
             );
         }
     }
@@ -564,13 +569,13 @@ fn load_auth(
     auth_credentials_store_mode: AuthCredentialsStoreMode,
 ) -> std::io::Result<Option<CodexAuth>> {
     let build_auth = |auth_dot_json: AuthDotJson, storage_mode| {
-        let client = crate::default_client::create_client();
+        let client = create_client();
         CodexAuth::from_auth_dot_json(codex_home, auth_dot_json, storage_mode, client)
     };
 
     // API key via env var takes precedence over any other auth method.
     if enable_codex_api_key_env && let Some(api_key) = read_codex_api_key_from_env() {
-        let client = crate::default_client::create_client();
+        let client = create_client();
         return Ok(Some(CodexAuth::from_api_key_with_client(
             api_key.as_str(),
             client,
@@ -1449,3 +1454,7 @@ impl AuthManager {
 #[cfg(test)]
 #[path = "auth_tests.rs"]
 mod tests;
+
+fn create_client() -> CodexHttpClient {
+    CodexHttpClient::new(reqwest::Client::new())
+}
