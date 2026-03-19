@@ -258,8 +258,8 @@ async fn build_config(
     codex_home: &Path,
     forced_login_method: Option<ForcedLoginMethod>,
     forced_chatgpt_workspace_id: Option<String>,
-) -> LoginRestrictions {
-    LoginRestrictions {
+) -> AuthConfig {
+    AuthConfig {
         codex_home: codex_home.to_path_buf(),
         auth_credentials_store_mode: AuthCredentialsStoreMode::File,
         forced_login_method,

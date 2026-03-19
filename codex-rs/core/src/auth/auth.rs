@@ -456,14 +456,14 @@ pub fn load_auth_dot_json(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoginRestrictions {
+pub struct AuthConfig {
     pub codex_home: PathBuf,
     pub auth_credentials_store_mode: AuthCredentialsStoreMode,
     pub forced_login_method: Option<ForcedLoginMethod>,
     pub forced_chatgpt_workspace_id: Option<String>,
 }
 
-pub fn enforce_login_restrictions(config: &LoginRestrictions) -> std::io::Result<()> {
+pub fn enforce_login_restrictions(config: &AuthConfig) -> std::io::Result<()> {
     let Some(auth) = load_auth(
         &config.codex_home,
         /*enable_codex_api_key_env*/ true,

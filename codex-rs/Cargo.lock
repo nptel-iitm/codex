@@ -1600,6 +1600,7 @@ dependencies = [
 name = "codex-auth"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "base64 0.22.1",
  "chrono",
@@ -1608,6 +1609,7 @@ dependencies = [
  "codex-keyring-store",
  "codex-otel",
  "codex-protocol",
+ "keyring",
  "once_cell",
  "pretty_assertions",
  "reqwest",
